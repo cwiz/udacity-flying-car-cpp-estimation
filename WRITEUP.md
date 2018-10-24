@@ -191,12 +191,4 @@ Controller from previous project was unable to perform quadrant route. The parts
 
 Limiting yaw to -Pi~Pi. Otherwise done was flying off route in Z direction on second turnabout.
 
-### LateralPositionControl
-
-Limiting velocity to maxSpeedXY and acceleration in maxSpeedXY. Otherwise controller was beahving strangely on turnabouts.
-
-### AltitudeControl
-
-Constraining Z velocity.
-
-Controller parameters used in previous project weren't able to keep drone on perfect path, and 30% paramaneter relaxation only did job partially (drone performed quadrant path, but deviated stochastically).
+I've detuned position and velocity gains by 30% but still controller is making a spiral-like shape.
