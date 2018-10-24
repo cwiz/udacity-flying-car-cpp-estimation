@@ -25,7 +25,6 @@ void QuadEstimatorEKF::UpdateFromIMU(V3F accel, V3F gyro)
 	float predictedPitch, predictedRoll;
 	float gyroX, gyroY;
 
-	// This scenario is only viable for small angles where we can safely neglect coordinate system conversions
 	if (smallAngle) {
 		gyroX = gyro.x;
 		gyroY = gyro.y;	
@@ -44,17 +43,12 @@ void QuadEstimatorEKF::UpdateFromIMU(V3F accel, V3F gyro)
 		ekfState(6) = pq.Yaw();     // yaw
 	}
 	
-	// normalize yaw to -pi .. pi
 	if (ekfState(6) > F_PI) ekfState(6) -= 2.f*F_PI;
 	if (ekfState(6) < -F_PI) ekfState(6) += 2.f*F_PI;
 
-	/////////////////////////////// END STUDENT CODE ////////////////////////////
-
-	// CALCULATE UPDATE
 	accelRoll = atan2f(accel.y, accel.z);
 	accelPitch = atan2f(-accel.x, 9.81f);
 
-	// FUSE INTEGRATION AND UPDATE
 	rollEst = attitudeTau / (attitudeTau + dtIMU) * (predictedRoll)+dtIMU / (attitudeTau + dtIMU) * accelRoll;
 	pitchEst = attitudeTau / (attitudeTau + dtIMU) * (predictedPitch)+dtIMU / (attitudeTau + dtIMU) * accelPitch;
 
@@ -80,7 +74,6 @@ MatrixXf QuadEstimatorEKF::GetRbgPrime(float roll, float pitch, float yaw)
 	float cos_theta = cos(pitch);
 	float cos_psi = cos(yaw);
 
-	// Rbg Prime
 	RbgPrime(0, 0) = -cos_theta * sin_psi;
 	RbgPrime(0, 1) = -sin_phi * sin_theta * sin_psi - cos_phi * cos_psi;
 	RbgPrime(0, 2) = -cos_phi * sin_theta * sin_psi + sin_phi * cos_psi;
@@ -89,9 +82,6 @@ MatrixXf QuadEstimatorEKF::GetRbgPrime(float roll, float pitch, float yaw)
 	RbgPrime(1, 1) = sin_phi * sin_theta * sin_psi + cos_phi * cos_psi;
 	RbgPrime(1, 2) = cos_phi * sin_theta * sin_psi - sin_phi * cos_psi;
 
-
-	/////////////////////////////// END STUDENT CODE ////////////////////////////
-
 	return RbgPrime;
 }
 ```
@@ -99,17 +89,12 @@ MatrixXf QuadEstimatorEKF::GetRbgPrime(float roll, float pitch, float yaw)
 ```cpp
 void QuadEstimatorEKF::Predict(float dt, V3F accel, V3F gyro)
 {
-	// predict the state forward
 	VectorXf newState = PredictState(ekfState, dt, accel, gyro);
 
-	// we'll want the partial derivative of the Rbg matrix
 	MatrixXf RbgPrime = GetRbgPrime(rollEst, pitchEst, ekfState(6));
 
-	// we've created an empty Jacobian for you, currently simply set to identity
 	MatrixXf gPrime(QUAD_EKF_NUM_STATES, QUAD_EKF_NUM_STATES);
 	gPrime.setIdentity();
-
-	////////////////////////////// BEGIN STUDENT CODE ///////////////////////////
 
 	gPrime(0, 3) = dt;
 	gPrime(1, 4) = dt;
@@ -176,12 +161,6 @@ void QuadEstimatorEKF::UpdateFromGPS(V3F pos, V3F vel)
 	MatrixXf hPrime(6, QUAD_EKF_NUM_STATES);
 	hPrime.setZero();
 
-	// GPS UPDATE
-	// Hints: 
-	//  - The GPS measurement covariance is available in member variable R_GPS
-	//  - this is a very simple update
-	////////////////////////////// BEGIN STUDENT CODE ///////////////////////////
-
 	hPrime(0, 0) = 1.f;
 	hPrime(1, 1) = 1.f;
 	hPrime(2, 2) = 1.f;
@@ -205,3 +184,19 @@ void QuadEstimatorEKF::UpdateFromGPS(V3F pos, V3F vel)
 ## 6. Adding Your Controller
 
 In this step we need to add controller from previous project and then tune parameters to successfully complete 11_GPSUpdate scenario.
+
+Controller from previous project was unable to perform quadrant route. The parts that needed modification were:
+
+### YawControl
+
+Limiting yaw to -Pi~Pi. Otherwise done was flying off route in Z direction on second turnabout.
+
+### LateralPositionControl
+
+Limiting velocity to maxSpeedXY and acceleration in maxSpeedXY. Otherwise controller was beahving strangely on turnabouts.
+
+### AltitudeControl
+
+Constraining Z velocity.
+
+Controller parameters used in previous project weren't able to keep drone on perfect path, and 30% paramaneter relaxation only did job partially (drone performed quadrant path, but deviated stochastically).
