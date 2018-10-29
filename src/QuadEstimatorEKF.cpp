@@ -93,28 +93,18 @@ void QuadEstimatorEKF::UpdateFromIMU(V3F accel, V3F gyro)
 	// (replace the code below)
 	// make sure you comment it out when you add your own code -- otherwise e.g. you might integrate yaw twice
 
-	bool smallAngle = false;
 	float predictedPitch, predictedRoll;
-	float gyroX, gyroY;
 
 	// This scenario is only viable for small angles where we can safely neglect coordinate system conversions
-	if (smallAngle) {
-		gyroX = gyro.x;
-		gyroY = gyro.y;	
 
-		predictedPitch = pitchEst + dtIMU * gyroY;  // pitch
-		predictedRoll = rollEst + dtIMU * gyroX;    // roll
-		ekfState(6) = ekfState(6) + dtIMU * gyro.z;	// yaw
-	} else {
-		Quaternion<float> qt, dq, pq;
-		qt = qt.FromEuler123_RPY(rollEst, pitchEst, ekfState(6));
-		dq = dq.IntegrateBodyRate(gyro, dtIMU);
-		pq = dq * qt;
+	Quaternion<float> qt, dq, pq;
+	qt = qt.FromEuler123_RPY(rollEst, pitchEst, ekfState(6));
+	dq = dq.IntegrateBodyRate(gyro, dtIMU);
+	pq = dq * qt;
 		
-		predictedPitch = pq.Pitch(); // pitch
-		predictedRoll = pq.Roll();   // roll
-		ekfState(6) = pq.Yaw();     // yaw
-	}
+	predictedPitch = pq.Pitch(); // pitch
+	predictedRoll = pq.Roll();   // roll
+	ekfState(6) = pq.Yaw();      // yaw
 	
 	// normalize yaw to -pi .. pi
 	if (ekfState(6) > F_PI) ekfState(6) -= 2.f*F_PI;
@@ -181,19 +171,16 @@ VectorXf QuadEstimatorEKF::PredictState(VectorXf curState, float dt, V3F accel, 
 
 	////////////////////////////// BEGIN STUDENT CODE ///////////////////////////
 
-	// UpdateFromIMU(accel, gyro);
 	V3F accelGlobal = attitude.Rotate_BtoI(accel);
 	accelGlobal[2] -= 9.81f;
 	
-	predictedState(0) += dt * predictedState(3);
-	predictedState(1) += dt * predictedState(4);
-	predictedState(2) += dt * predictedState(5);
+	predictedState(0) += dt * ekfState(3);
+	predictedState(1) += dt * ekfState(4);
+	predictedState(2) += dt * ekfState(5);
 
 	predictedState(3) += dt * accelGlobal[0];
 	predictedState(4) += dt * accelGlobal[1];
 	predictedState(5) += dt * accelGlobal[2];
-
-	// predictedState(6) = curState(6);
 
 	/////////////////////////////// END STUDENT CODE ////////////////////////////
 
@@ -328,19 +315,10 @@ void QuadEstimatorEKF::UpdateFromGPS(V3F pos, V3F vel)
 	//  - this is a very simple update
 	////////////////////////////// BEGIN STUDENT CODE ///////////////////////////
 
-	hPrime(0, 0) = 1.f;
-	hPrime(1, 1) = 1.f;
-	hPrime(2, 2) = 1.f;
-	hPrime(3, 3) = 1.f;
-	hPrime(4, 4) = 1.f;
-	hPrime(5, 5) = 1.f;
-
-	zFromX(0) = ekfState(0);
-	zFromX(1) = ekfState(1);
-	zFromX(2) = ekfState(2);
-	zFromX(3) = ekfState(3);
-	zFromX(4) = ekfState(4);
-	zFromX(5) = ekfState(5);
+	for (int i = 0; i < 6; i++) {
+		hPrime(i, i) = 1;
+		zFromX(i) = ekfState(i);
+	}
 
 	/////////////////////////////// END STUDENT CODE ////////////////////////////
 
@@ -366,6 +344,10 @@ void QuadEstimatorEKF::UpdateFromMag(float magYaw)
 	hPrime(0, 6) = 1;
 
 	zFromX(0) = ekfState(6);
+
+	float d = z(0) - ekfState(6);
+	if (d > F_PI) z(0) -= 2.f*F_PI;
+	if (d < -F_PI) z(0) += 2.f*F_PI;
 
 	/////////////////////////////// END STUDENT CODE ////////////////////////////
 

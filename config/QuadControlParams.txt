@@ -39,16 +39,14 @@ maxSpeedXY = 5
 maxHorizAccel = 12
 maxTiltAngle = .7
 
-UseIdealEstimator=1
-
 # Position control gains
-kpPosXY = 35
+kpPosXY = 12
 kpPosZ = 35
-KiPosZ = 35
+KiPosZ = 200
 
 # Velocity control gains
-kpVelXY = 15
-kpVelZ = 15
+kpVelXY = 10
+kpVelZ = 40
 
 # Angle control gains
 kpBank = 10
