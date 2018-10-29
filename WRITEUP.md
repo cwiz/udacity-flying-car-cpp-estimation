@@ -21,7 +21,7 @@ MeasuredStdDev_GPSPosXY = 0.71
 MeasuredStdDev_AccelXY = 0.49
 ```
 
-![screen_1](images/scenario-1.png "Scenario 1")
+![screen_1](images/scenario-1.PNG "Scenario 1")
 
 ## 2. Attitude Estimation
 
@@ -58,7 +58,7 @@ void QuadEstimatorEKF::UpdateFromIMU(V3F accel, V3F gyro)
 }
 ```
 
-![screen_2](images/scenario-2.png "Scenario 2")
+![screen_2](images/scenario-2.PNG "Scenario 2")
 
 ## 3. Prediction Step
 
@@ -153,9 +153,9 @@ MatrixXf QuadEstimatorEKF::GetRbgPrime(float roll, float pitch, float yaw)
 }
 ```
 
-![screen_3](images/scenario-3.png "Scenario 3")
+![screen_3](images/scenario-3.PNG "Scenario 3")
 
-![screen_3_1](images/scenario-3-1.png "Scenario 3.1")
+![screen_3_1](images/scenario-3-a.PNG "Scenario 3.1")
 
 ## 4. Magnetometer Update
 
@@ -181,7 +181,7 @@ void QuadEstimatorEKF::UpdateFromMag(float magYaw)
 }
 ```
 
-![screen_4](images/scenario-4.png "Scenario 4")
+![screen_4](images/scenario-4.PNG "Scenario 4")
 
 ## 5. Closed Loop + GPS Update
 
@@ -229,4 +229,4 @@ kpVelXY = 10 # decreased 3x
 kpVelZ = 40 # decreased 30%
 ```
 
-![screen_5](images/scenario-4.png "Scenario 5")
+![screen_5](images/scenario-4.PNG "Scenario 5")
