@@ -14,9 +14,20 @@ print(np.std(gps_x))
 print(np.std(acc_x))
 ```
 
+Resulting values are:
+
+```python
+MeasuredStdDev_GPSPosXY = 0.71
+MeasuredStdDev_AccelXY = 0.49
+```
+
+![screen_1](images/scenario-1.png "Scenario 1")
+
 ## 2. Attitude Estimation
 
 To complete this step we need to implement UpdateFromIMU() function. Integration scheme used here involves integrating gyro measurements in body frame and then converting them into global frame using quaternions.
+
+Quaternions were chosen due to ease of implementation of IMU update procedure.
 
 ```cpp
 void QuadEstimatorEKF::UpdateFromIMU(V3F accel, V3F gyro)
@@ -25,24 +36,15 @@ void QuadEstimatorEKF::UpdateFromIMU(V3F accel, V3F gyro)
 	float predictedPitch, predictedRoll;
 	float gyroX, gyroY;
 
-	if (smallAngle) {
-		gyroX = gyro.x;
-		gyroY = gyro.y;	
-
-		predictedPitch = pitchEst + dtIMU * gyroY;  // pitch
-		predictedRoll = rollEst + dtIMU * gyroX;    // roll
-		ekfState(6) = ekfState(6) + dtIMU * gyro.z;	// yaw
-	} else {
-		Quaternion<float> qt, dq, pq;
-		qt = qt.FromEuler123_RPY(rollEst, pitchEst, ekfState(6));
-		dq = dq.IntegrateBodyRate(gyro, dtIMU);
-		pq = dq * qt;
-		
-		predictedPitch = pq.Pitch(); // pitch
-		predictedRoll = pq.Roll();   // roll
-		ekfState(6) = pq.Yaw();     // yaw
-	}
+	Quaternion<float> qt, dq, pq;
+	qt = qt.FromEuler123_RPY(rollEst, pitchEst, ekfState(6));
+	dq = dq.IntegrateBodyRate(gyro, dtIMU);
+	pq = dq * qt;
 	
+	predictedPitch = pq.Pitch(); // pitch
+	predictedRoll = pq.Roll();   // roll
+	ekfState(6) = pq.Yaw();     // yaw
+
 	if (ekfState(6) > F_PI) ekfState(6) -= 2.f*F_PI;
 	if (ekfState(6) < -F_PI) ekfState(6) += 2.f*F_PI;
 
@@ -56,34 +58,40 @@ void QuadEstimatorEKF::UpdateFromIMU(V3F accel, V3F gyro)
 }
 ```
 
+![screen_2](images/scenario-2.png "Scenario 2")
+
 ## 3. Prediction Step
 
-To complete this step we need to implement GetRbgPrime() and Predict().
+To complete this step we need to implement GetRbgPrime() and PredictState() and Predict().
+
+This scenario is about implementing prediction step of Kalman filter. GetRbgPrime calculates coodinate conversion matrix needed to properly adjust covariance matrix.
 
 ```cpp
-MatrixXf QuadEstimatorEKF::GetRbgPrime(float roll, float pitch, float yaw)
+VectorXf QuadEstimatorEKF::PredictState(VectorXf curState, float dt, V3F accel, V3F gyro)
 {
-	MatrixXf RbgPrime(3, 3);
-	RbgPrime.setZero();
+	assert(curState.size() == QUAD_EKF_NUM_STATES);
+	VectorXf predictedState = curState;
 
-	float sin_phi = sin(roll);
-	float sin_theta = sin(pitch);
-	float sin_psi = sin(yaw);
+	Quaternion<float> attitude = Quaternion<float>::FromEuler123_RPY(rollEst, pitchEst, curState(6));
 
-	float cos_phi = cos(roll);
-	float cos_theta = cos(pitch);
-	float cos_psi = cos(yaw);
+	////////////////////////////// BEGIN STUDENT CODE ///////////////////////////
 
-	RbgPrime(0, 0) = -cos_theta * sin_psi;
-	RbgPrime(0, 1) = -sin_phi * sin_theta * sin_psi - cos_phi * cos_psi;
-	RbgPrime(0, 2) = -cos_phi * sin_theta * sin_psi + sin_phi * cos_psi;
+	V3F accelGlobal = attitude.Rotate_BtoI(accel);
+	accelGlobal[2] -= 9.81f;
+	
+	predictedState(0) += dt * ekfState(3);
+	predictedState(1) += dt * ekfState(4);
+	predictedState(2) += dt * ekfState(5);
 
-	RbgPrime(1, 0) = cos_theta * sin_psi;
-	RbgPrime(1, 1) = sin_phi * sin_theta * sin_psi + cos_phi * cos_psi;
-	RbgPrime(1, 2) = cos_phi * sin_theta * sin_psi - sin_phi * cos_psi;
+	predictedState(3) += dt * accelGlobal[0];
+	predictedState(4) += dt * accelGlobal[1];
+	predictedState(5) += dt * accelGlobal[2];
 
-	return RbgPrime;
+	/////////////////////////////// END STUDENT CODE ////////////////////////////
+
+	return predictedState;
 }
+
 ```
 
 ```cpp
@@ -119,6 +127,36 @@ void QuadEstimatorEKF::Predict(float dt, V3F accel, V3F gyro)
 }
 ```
 
+```cpp
+MatrixXf QuadEstimatorEKF::GetRbgPrime(float roll, float pitch, float yaw)
+{
+	MatrixXf RbgPrime(3, 3);
+	RbgPrime.setZero();
+
+	float sin_phi = sin(roll);
+	float sin_theta = sin(pitch);
+	float sin_psi = sin(yaw);
+
+	float cos_phi = cos(roll);
+	float cos_theta = cos(pitch);
+	float cos_psi = cos(yaw);
+
+	RbgPrime(0, 0) = -cos_theta * sin_psi;
+	RbgPrime(0, 1) = -sin_phi * sin_theta * sin_psi - cos_phi * cos_psi;
+	RbgPrime(0, 2) = -cos_phi * sin_theta * sin_psi + sin_phi * cos_psi;
+
+	RbgPrime(1, 0) = cos_theta * sin_psi;
+	RbgPrime(1, 1) = sin_phi * sin_theta * sin_psi + cos_phi * cos_psi;
+	RbgPrime(1, 2) = cos_phi * sin_theta * sin_psi - sin_phi * cos_psi;
+
+	return RbgPrime;
+}
+```
+
+![screen_3](images/scenario-3.png "Scenario 3")
+
+![screen_3_1](images/scenario-3-1.png "Scenario 3.1")
+
 ## 4. Magnetometer Update
 
 To complete this step we need to implement UpdateFromMag() function end estimate magnetometer std dev.
@@ -143,6 +181,8 @@ void QuadEstimatorEKF::UpdateFromMag(float magYaw)
 }
 ```
 
+![screen_4](images/scenario-4.png "Scenario 4")
+
 ## 5. Closed Loop + GPS Update
 
 In order to complete this step we need to UpdateFromGPS() and tune GPS std dev in EKF estimator.
@@ -161,19 +201,10 @@ void QuadEstimatorEKF::UpdateFromGPS(V3F pos, V3F vel)
 	MatrixXf hPrime(6, QUAD_EKF_NUM_STATES);
 	hPrime.setZero();
 
-	hPrime(0, 0) = 1.f;
-	hPrime(1, 1) = 1.f;
-	hPrime(2, 2) = 1.f;
-	hPrime(3, 3) = 1.f;
-	hPrime(4, 4) = 1.f;
-	hPrime(5, 5) = 1.f;
-
-	zFromX(0) = ekfState(0);
-	zFromX(1) = ekfState(1);
-	zFromX(2) = ekfState(2);
-	zFromX(3) = ekfState(3);
-	zFromX(4) = ekfState(4);
-	zFromX(5) = ekfState(5);
+	for (int i = 0; i < 6; i++) {
+		hPrime(i, i) = 1;
+		zFromX(i) = ekfState(i);
+	}
 
 	/////////////////////////////// END STUDENT CODE ////////////////////////////
 
@@ -183,12 +214,19 @@ void QuadEstimatorEKF::UpdateFromGPS(V3F pos, V3F vel)
 
 ## 6. Adding Your Controller
 
-In this step we need to add controller from previous project and then tune parameters to successfully complete 11_GPSUpdate scenario.
+In this step we need to add controller from previous project, revert to new estimator and realistic sensors and then tune parameters to successfully complete 11_GPSUpdate scenario.
 
-Controller from previous project was unable to perform quadrant route. The parts that needed modification were:
+Controller parameters adjusted for this scenario
 
-### YawControl
+```python
+# Position control gains
+kpPosXY = 12 # detuning to 12 didn't affect behaviour of controller in ideal conditions
+kpPosZ = 35 # was detuned approx 30 percent
+KiPosZ = 200 # I term of PID controller was increased 4x. Otherwise drone was getting off bneeded height and adjusted it slowly.
 
-Limiting yaw to -Pi~Pi. Otherwise done was flying off route in Z direction on second turnabout.
+# Velocity control gains
+kpVelXY = 10 # decreased 3x
+kpVelZ = 40 # decreased 30%
+```
 
-I've detuned position and velocity gains by 30% but still controller is making a spiral-like shape.
+![screen_5](images/scenario-4.png "Scenario 5")
