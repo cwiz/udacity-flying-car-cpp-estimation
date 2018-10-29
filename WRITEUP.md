@@ -229,4 +229,4 @@ kpVelXY = 10 # decreased 3x
 kpVelZ = 40 # decreased 30%
 ```
 
-![screen_5](images/scenario-4.PNG "Scenario 5")
+![screen_5](images/scenario-5.PNG "Scenario 5")
